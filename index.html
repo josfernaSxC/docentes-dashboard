@@ -453,16 +453,9 @@ let nivelChart = null;
 
 const uploadSection = document.getElementById('upload-section');
 const dashboard = document.getElementById('dashboard');
-const csvInput = document.getElementById('csv-input');
 
-uploadSection.addEventListener('dragover', e => { e.preventDefault(); uploadSection.classList.add('drag-over'); });
-uploadSection.addEventListener('dragleave', () => uploadSection.classList.remove('drag-over'));
-uploadSection.addEventListener('drop', e => { e.preventDefault(); uploadSection.classList.remove('drag-over'); if (e.dataTransfer.files[0]) parseFile(e.dataTransfer.files[0]); });
-csvInput.addEventListener('change', e => { if (e.target.files[0]) parseFile(e.target.files[0]); });
-
-function parseFile(file) {
-  document.getElementById('file-status').textContent = 'Cargando…';
-  Papa.parse(file, {
+function loadData(text, source) {
+  Papa.parse(text, {
     header: true, dynamicTyping: true, skipEmptyLines: true,
     complete: res => {
       ALL = res.data.filter(r => r.NOM_COM_RBD).map(r => ({
@@ -472,15 +465,32 @@ function parseFile(file) {
         subsector: r.NOM_SUBSECTOR || '',
         total: Number(r.TOTAL_DOCENTES) || 0
       }));
-      document.getElementById('file-status').textContent = '✓ ' + file.name + ' · ' + ALL.length.toLocaleString('es-CL') + ' registros';
-      uploadSection.style.borderStyle = 'solid';
+      uploadSection.style.display = 'none';
       initSelects();
       dashboard.style.display = 'block';
       update();
-    },
-    error: () => { document.getElementById('file-status').textContent = 'Error al leer el archivo.'; }
+    }
   });
 }
+
+fetch('docentes_por_comuna.csv')
+  .then(r => { if (!r.ok) throw new Error('not found'); return r.text(); })
+  .then(text => loadData(text, 'auto'))
+  .catch(() => {
+    uploadSection.style.display = 'flex';
+    uploadSection.style.flexDirection = 'column';
+    uploadSection.style.alignItems = 'center';
+    const csvInput = document.getElementById('csv-input');
+    uploadSection.addEventListener('dragover', e => { e.preventDefault(); uploadSection.classList.add('drag-over'); });
+    uploadSection.addEventListener('dragleave', () => uploadSection.classList.remove('drag-over'));
+    uploadSection.addEventListener('drop', e => {
+      e.preventDefault(); uploadSection.classList.remove('drag-over');
+      if (e.dataTransfer.files[0]) { const r = new FileReader(); r.onload = ev => loadData(ev.target.result); r.readAsText(e.dataTransfer.files[0]); }
+    });
+    csvInput.addEventListener('change', e => {
+      if (e.target.files[0]) { const r = new FileReader(); r.onload = ev => loadData(ev.target.result); r.readAsText(e.target.files[0]); }
+    });
+  });
 
 function uniq(arr) { return [...new Set(arr)].filter(Boolean).sort(); }
 
